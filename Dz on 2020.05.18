@@ -64,11 +64,6 @@ def qsort(l):
                 l2.append(i)
             else:
                 l3.append(i)
-        print(m)
-        print(l1)
-        print(l2)
-        print(l3)
-        o = input()
         return ((qsort (l1)) + l3 +(qsort (l2)))
 
 l = qsort([1,2,5,1,6,8,3])
