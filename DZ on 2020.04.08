@@ -177,10 +177,8 @@ let _ = betta_reduct_with_writing ((fun (x,y) -> y) (read_l "(($a.$b.((a $n.$f.$
 print_string"end\n\n";;
 
 let check_normal lam =
-let deb = (debraun_of_lamda lam) in
-let n_deb = betta_reduction deb in
-if n_deb = deb then true else false;;
+if (find_bette_redex lam) = [] then true else false;;
 
-print_string"Is '(\x.(x x)) (\x.(x x))' normal form?\nAnswer: ";;
+print_string"Is '(\x.(x x) \x.(x x))' normal form?\nAnswer: ";;
 
-print_string(if (check_normal ((fun (x,y) -> y) (read_l "($x.(x x)) ($x.(x x))" 0))) then "Yes\n" else "No\n");;
+print_string(if (check_normal ((fun (x,y) -> y) (read_l "($x.(x x) $x.(x x))" 0))) then "Yes\n" else "No\n");;
