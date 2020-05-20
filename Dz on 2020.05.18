@@ -1,0 +1,86 @@
+def catalan(n):
+    if n == 0:
+        return 1
+    else:
+        k = 0
+        for i in range(n):
+            k = k + ((catalan(i))*(catalan(n - 1 - i)))
+        return k
+
+for i in range(3):
+    print(catalan(i))
+
+
+
+n = int(input())
+
+for y in range(2*n+1):
+    y = y - n
+    for x in range(2*n + 1):
+        x = x - n
+        if (x*x + y*y) <= n*n:
+            print("x",end = '')
+        else:
+            print(" ",end = '')
+    print(" ")
+
+n = int(input())
+
+m = int(input())
+
+def printf(j,w):
+    print(j, end = ' ')
+    for i in range(w - len(str(j))):
+        print("",end = ' ')
+
+w = (len(str(n*m))) + 2;
+printf(" ",w)
+print("| ",end = '')
+for i in range(n+1):
+    printf(i,w)
+print(" ")
+for i in range(m+1):
+    for o in range(w*(n+3) + 2):
+        print("-",end = '')
+    print(" ")
+    printf(i,w)
+    print("|", end = ' ')
+    for j in range(n+1):
+        printf(i*j,w)
+    print(" ")
+
+def qsort(l):
+    if len(l) <= 1:
+        return l
+    else:
+        m = l[0]
+        l1 = []
+        l2 = []
+        l3 = []
+        for i in l:
+            if i < m:
+                l1.append(i)
+            elif i > m:
+                l2.append(i)
+            else:
+                l3.append(i)
+        print(m)
+        print(l1)
+        print(l2)
+        print(l3)
+        o = input()
+        return ((qsort (l1)) + l3 +(qsort (l2)))
+
+l = qsort([1,2,5,1,6,8,3])
+print(l)
+
+
+    
+
+
+
+
+
+
+
+
