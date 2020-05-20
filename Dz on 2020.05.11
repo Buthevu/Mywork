@@ -1,0 +1,265 @@
+type l = Var of string|App of l * l|Abs of string * l;;        
+
+let rec find_bette_redex l =
+match l with
+Var s-> []
+|App (l1,l2) -> (match l1 with
+                 Abs (_,_) -> [App (l1,l2)] @ (find_bette_redex l1) @ (find_bette_redex l2)  
+                |_->(find_bette_redex l1) @ (find_bette_redex l2))
+|Abs (s,l1) ->(find_bette_redex l1);;
+
+let rec string_of_l l=
+  match l with
+   Var s->s
+  |App (l1,l2) -> "("^(string_of_l l1)^" "^(string_of_l l2)^")"
+  |Abs (s,l2) -> "$"^s^"."^string_of_l l2;;
+
+let rec read_l s i=
+if s.[i] = '(' then (let (i2,l2)= read_l s (i+1) in 
+                                        let (i3,l3)= read_l s (i2+1) in (i3+1,App (l2,l3)))
+               else if s.[i] = '$' then (let (i2,s2)= read_s s (i+1) in
+                                        let (i3,l3)= read_l s (i2+1) in (i3,Abs (s2,l3)))
+                                   else let (i2,s2) = read_s s i in
+                                                   (i2,Var s2)
+
+and read_s s i=
+if i = String.length s then (i,"")
+                       else if (s.[i] = '.')||(s.[i] = ' ')||(s.[i] = ')') then (i,"")
+                                                                         else let (i2,s2) = (read_s s (i+1)) in
+                                                                                  (i2,((String.make 1 (s.[i]))^s2));;
+
+
+
+(*\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*)
+
+type debraun = Var_d of string| Index of int| App_d of debraun * debraun| Abs_d of  debraun;;
+
+let rec check_include x l=
+match l with
+a::b->if a = x then true else (check_include x b)
+|[]->false;;
+
+let rec get_index x l=
+match l with
+a::b-> if a = x then 1 else (1+(get_index x b))
+|[]->failwith"2";;
+
+let debraun_of_lamda lamd=
+let rec sup_f lam lis=
+match lam with
+Var s-> if (check_include s lis) then Index (get_index s lis) else Var_d s
+|App (l1,l2) -> App_d (sup_f l1 lis,sup_f l2 lis)
+|Abs (s,l2) -> Abs_d (sup_f l2 (s::lis)) in
+sup_f lamd [];;
+
+let rec print_lamda lam =
+match lam with
+Var s-> print_string("\""^s^"\"")
+|App (l1,l2) -> print_string"(";print_lamda l1;print_string" ";print_lamda l2;print_string")"
+|Abs (s,l2)-> print_string("$\""^s^"\".");print_lamda l2;;
+
+let rec print_debraun deb =
+match deb with
+Var_d s-> print_string("\""^s^"\"")
+|Index i->print_int i
+|App_d (l1,l2) -> print_string"(";print_debraun l1;print_string" ";print_debraun l2;print_string")"
+|Abs_d l2-> print_string"$.";print_debraun l2;;
+ 
+
+print_debraun (debraun_of_lamda (Abs ("x",(App (Var "x",Var"y")))));;
+
+let find_new l=
+let rec sup_f i lis=
+if (check_include ("x#"^(string_of_int i)) lis) then (sup_f (i+1) lis) else (string_of_int i) in
+"x#"^(sup_f 1 l);;
+
+let rec list_of_names_debraun deb=
+match deb with
+Var_d s->[s]
+|App_d (l1,l2) -> ((list_of_names_debraun l1)@(list_of_names_debraun l2))
+|Abs_d l2 ->(list_of_names_debraun l2)
+|_-> [];;
+
+ 
+let rec give_elem i l=
+match l with
+a::b-> if i = 1 then a else (give_elem  (i - 1) b)
+|[]-> failwith"1";;
+
+
+let lamda_of_debraun lamd=
+let rec sup_f lam lis_var lis_name=
+(match lam with
+Var_d s->(lis_name,Var s)
+|Index i->(lis_name,Var (give_elem i lis_var))
+|Abs_d l2->let n_var = (find_new lis_name) in 
+           let (n_lis_name,n_l) = (sup_f l2 (n_var::lis_var) (n_var::lis_name)) in 
+                          (n_lis_name,Abs (n_var,n_l))
+|App_d (l1,l2)->let (n_lis_name,n_l1) = (sup_f l1 lis_var lis_name) in
+                let (nn_lis_name,n_l2) = (sup_f l2 lis_var (*n_lis_name*)lis_name) in
+                  (nn_lis_name,App (n_l1,n_l2)) )in
+(fun (x,y) -> y) (sup_f lamd [] (list_of_names_debraun lamd));;
+
+let rec check_bette_red deb =
+match deb with
+App_d (l1,l2) -> (match l1 with Abs_d _->true|_->((check_bette_red l1)||(check_bette_red l2)))
+|Abs_d l2 -> check_bette_red l2
+|_->false;;
+
+let level_up deb=
+let rec sup_f de n=
+match de with
+Var_d s->Var_d s
+|Index i -> if i >= n then Index (i+1) else de
+|App_d (l1,l2) -> App_d (sup_f l1 n,sup_f l2 n)
+|Abs_d l2->Abs_d (sup_f l2 (n+1)) in
+sup_f deb 1;;       
+
+let rec replace deb n deb2=
+match deb with
+Index i-> if i = n then deb2 else (if i > n then Index (i -1) else Index i)
+|Var_d s->Var_d s
+|App_d (l1,l2) ->App_d ((replace l1 n deb2),(replace l2 n deb2))
+|Abs_d l2->Abs_d (replace l2 (n+1) (level_up deb2));;
+
+let rec betta_reduction deb=
+match deb with
+Index i-> Index i
+|Var_d s-> Var_d s
+|App_d (l1,l2) -> (match l1 with
+                   Abs_d l3 -> (replace l3 1 l2)
+                  |_-> let n_l1 = betta_reduction l1 in if n_l1 = l1 then (App_d (l1,(betta_reduction l2))) else (App_d (n_l1,l2))) 
+|Abs_d l2-> Abs_d (betta_reduction l2);;
+
+let rec just_betta_reduct lam=
+let deb = (debraun_of_lamda lam) in
+let n_deb = betta_reduction deb in
+if n_deb = deb then lam else (just_betta_reduct (lamda_of_debraun n_deb));;
+                                        
+
+let rec list_list_01_len n = if n = 1 then [[0];[1]] else(let l = (list_list_01_len (n-1)) in ((List.map (fun x -> 0::x) l)@(List.map (fun x-> 1::x) l)));;
+
+let rec give_n_elem n l=
+match l with
+a::b -> if n = 0 then a else (give_n_elem (n-1) b)
+|[]->failwith"";;
+
+let rec give_fun_K_N k n=
+give_n_elem k (list_list_01_len n);;
+
+let rec all_fun n = list_list_01_len (int_of_float (2.**(float_of_int n)));;
+
+let rec print_list f l=
+match l with
+a::b::c->f a;print_string ";";print_list f (b::c) 
+|a::b->f a;print_string"]";
+|[]->print_string"]";;
+
+let rec find_fun n k = give_n_elem k (all_fun n);;
+
+let print_tabl k n =
+let rec print_list l =
+match l with
+a::b::c->print_int a;print_string","; print_list (b::c)
+|a::b->print_int a; print_string")"
+|[]->print_string")" in
+for i = 0 to ((int_of_float (2.**(float_of_int n))) - 1) do
+print_string"f (";
+print_list (give_n_elem i (list_list_01_len n));
+print_string" -> ";
+print_int (give_n_elem i (find_fun n k));
+print_string"\n";
+done;;
+
+print_tabl 4 2;;
+print_string"it was k = 4, n = 2\n(press enter to see next one)\n\n";;
+
+let _ = read_line();;
+
+print_tabl 7 2;;
+print_string"it was k = 7, n = 2\n(press enter to see next one)\n\n";;
+
+let _ = read_line();;
+
+print_tabl 11 2;;
+print_string"it was k = 11, n = 2\n(press enter to see next one)\n\n";;
+
+let _ = read_line();;
+
+print_tabl 15 2;;
+print_string"it was k = 15, n = 2\n(press enter to see next one)\n\n";;
+
+let _ = read_line();;
+
+print_tabl 19 3;;
+print_string"it was k = 19, n = 3\n(press enter to see next one)\n\n";;
+
+let _ = read_line();;
+
+print_tabl 220 3;;
+print_string"it was k = 220, n = 3\n(press enter to see next one)\n\n";;
+
+let _ = read_line();;
+
+print_tabl 171 3;;
+print_string"it was k = 171, n = 3\n(press enter to see next one)\n\n";;
+
+let _ = read_line();;
+
+print_tabl 8328 4;;
+print_string"it was k = 8328, n = 4\n(press enter to see next one)\n\n";;
+
+let _ = read_line();;
+
+print_tabl 17721 4;;
+print_string"it was k = 17721, n = 4\n(press enter to see next one)\n\n";;
+
+let _ = read_line();;
+
+print_tabl 999 4;;
+print_string"it was k = 999, n = 4 \n(press enter)\n\n";;
+
+let _ = read_line();;
+
+print_string"all functouns of 3 elem";;
+
+print_string"[";
+print_list (fun x -> print_string"\n[";print_list print_int x) (all_fun 3);;
+
+
+let chek lam n k=
+let rec feed l lis =
+match lis with
+a::b::c -> feed (App (l,if a = 1 then (Abs ("x",Abs ("y",Var "x"))) else (Abs ("x",Abs ("y",Var "y"))))) (b::c)
+|a::b-> (App (l,if a = 1 then (Abs ("x",Abs ("y",Var "x"))) else (Abs ("x",Abs ("y",Var "y")))))
+|_->failwith"" in
+let rec sup_f i=
+if i = (int_of_float (2.**(float_of_int n))) then true 
+                                             else (if ((just_betta_reduct (feed lam (give_n_elem i (list_list_01_len n)))) = (if (give_n_elem i (find_fun n k)) = 1 
+                                                                                                                                     then Abs ("x#1",Abs ("x#2",Var "x#1")) 
+                                                                                                                                     else Abs ("x#1",Abs ("x#2",Var "x#2")))) 
+                                                                then (sup_f (i+1)) 
+                                                                else false) in (sup_f 0);;
+
+let rec hafh l=
+let rec sup_f lis i=
+if i = ((List.length l)/ 2) then ([],lis)
+                              else (match lis with
+                                   a::b-> let (x,y) = sup_f b (i+1) in (a::x,y)
+                                  |_-> failwith"") in
+sup_f l 0;;
+
+let rec make_function l= 
+if l = [1]; then (Abs ("x",Abs ("y",Var "x")))
+else if l = [0] then (Abs ("x",Abs ("y",Var "y")))
+else (let (x,y) = hafh l in (Abs ("x",(App (App (Var "x",(make_function x)), (make_function y))))));;
+
+print_string"\n\n make_function (lamda) of [0;0;0;1]: \n";;
+
+print_lamda (make_function [0;0;0;1]);;
+
+
+print_string"\n\nis (Abs (\"x\",Abs (\"y\",App ((App (Var \"x\",Var \"y\")),Abs (\"x\",Abs (\"y\",Var \"y\")))))) (it is function 'and') is function with n = 2, k = 1? \n Answer: ";;
+
+print_string(if (chek (Abs ("x",Abs ("y",App ((App (Var "x",Var "y")),Abs ("x",Abs ("y",Var "y")))))) 2 1) then "Yes" else "No");;
