@@ -1,0 +1,140 @@
+type debraun = Var_d of string| Index of int| App_d of debraun * debraun| Abs_d of  debraun;;
+
+let rec print_debraun deb=
+match deb with
+Var_d s->print_string("Var_d "^s)
+|Index i -> print_string "Index ";print_int i
+|App_d (l1,l2) -> print_string"App_d (";print_debraun l1;print_string",";print_debraun l2;print_string")"
+|Abs_d l1-> print_string"Abs_d "; print_debraun l1;;
+
+print_string"print_debraun of App_d (Abs_d Index 1, Index 2) \n";;
+
+print_debraun (App_d (Abs_d (Index 1), Index 2));;
+
+print_string"\n\n";;
+
+let rec find_variable deb n=
+match deb with
+Var_d s->0
+|Index i -> if i = n then 1 else 0
+|App_d (l1,l2) -> ((find_variable l1 n) + (find_variable l2 n))
+|Abs_d l1-> find_variable l1 (n+1);;
+
+print_string"find_variable  (App (Index 3, Abs (Index 4))) 3 is \n";;
+
+print_int (find_variable  (App_d (Index 3,Abs_d (Index 4))) 3);;
+
+print_string"\n";;
+
+print_string"find_variable  (App (Index 3, Abs (Index 4))) 4 is \n";;
+
+print_int (find_variable  (App_d (Index 3,Abs_d (Index 4))) 4);;
+
+print_string"\n\n";;
+
+let rec replace_variable deb n=
+match deb with
+Var_d s->Var_d s
+|Index i -> if i = n then (Index 9999999) else deb
+|App_d (l1,l2) -> App_d ((replace_variable l1 n),(replace_variable l2 n))
+|Abs_d l1-> Abs_d (replace_variable l1 (n+1));;
+
+print_string "replace_variable (App (Index 3, Abs (Index 4))) 3 is\n";;
+
+print_debraun (replace_variable (App_d (Index 3,Abs_d (Index 4))) 3);;
+
+print_string"\n\n";;
+
+let rec replace_variable2 deb n1 n2=
+match deb with
+Var_d s->Var_d s
+|Index i -> if i = n1 then (Index n2) else deb
+|App_d (l1,l2) -> App_d ((replace_variable2 l1 n1 n2),(replace_variable2 l2 n1 n2))
+|Abs_d l1-> Abs_d (replace_variable2 l1 (n1+1) (n2 + 1));;
+
+print_string "replace_variable (App (Index 3, Abs (Index 4))) 3 11 is\n";;
+
+print_debraun (replace_variable2 (App_d (Index 3,Abs_d (Index 4))) 3 11);;
+
+print_string"\n\n";;
+
+
+let update_variable n1 n2=
+if n2 > n1 then (n1 + n2) else n2;;
+
+print_string "update_variable 2 3 is\n";;
+
+print_int (update_variable 2 3);;
+
+print_string"\n";;
+
+print_string "update_variable 3 2 is\n";;
+
+print_int (update_variable 3 2);;
+
+print_string"\n\n";;
+
+
+let level_up deb=
+let rec sup_f de n=
+match de with
+Var_d s->Var_d s
+|Index i -> if i >= n then Index (i+1) else de
+|App_d (l1,l2) -> App_d (sup_f l1 n,sup_f l2 n)
+|Abs_d l2->Abs_d (sup_f l2 (n+1)) in
+sup_f deb 1;;       
+
+let rec replace_expression deb n deb2=
+match deb with
+Index i-> if i = n then deb2 else (if i > n then Index (i - 1) else Index i)
+|Var_d s->Var_d s
+|App_d (l1,l2) ->App_d ((replace_expression l1 n deb2),(replace_expression l2 n deb2))
+|Abs_d l2->Abs_d (replace_expression l2 (n+1) (level_up deb2));;
+
+print_string"replace_expression (App (Index 3, Abs (Index 4))) 3 (App (Index 1, Abs (Index 1))) is \n";;
+
+print_debraun (replace_expression (App_d (Index 3, Abs_d (Index 4))) 3 (App_d (Index 1, Abs_d (Index 1))));;
+
+print_string"\n\n";;
+
+let rec leftmost_redex deb =
+match deb with
+Index i-> failwith""
+|Var_d s-> failwith""
+|App_d (l1,l2) ->(match l1 with 
+                   Abs_d _ -> deb 
+                  |_-> try 
+                           (leftmost_redex l1) 
+                       with 
+                           _ ->(leftmost_redex l2))
+|Abs_d l2-> leftmost_redex l2;;
+
+print_string "leftmost_redex (App ((Abs (App (Abs Index 1, Index 2))),(App (Abs Index 1,Index 2)))) is \n";;
+
+print_debraun (leftmost_redex (App_d ((Abs_d (App_d (Abs_d (Index 1), Index 2))),(App_d (Abs_d (Index 1),Index 2)))));;
+
+print_string"\n\n";;
+
+let rec extract_expression n debraun =
+match debraun with
+Var_d s -> Var_d s
+|Index i -> if i < n then Index i else Index (i - n)
+|App_d (l1,l2) -> App_d (extract_expression n l1,extract_expression n l2)
+|Abs_d l1 -> Abs_d (extract_expression (n+1) l1);;
+
+print_string"extract_expression 2 (App (Index 3) (Abs (Index 1))) is \n";;
+
+print_debraun(extract_expression 2 (App_d (Index 3,Abs_d (Index 1))));;
+
+
+
+
+
+
+
+
+
+
+
+
+ 
