@@ -1,0 +1,198 @@
+type lamda = Var of string| App of lamda * lamda| Abs of string * lamda;;
+type debraun = Var_d of string| Index of int| App_d of debraun * debraun| Abs_d of  debraun;;
+
+let rec check_include x l=
+match l with
+a::b->if a = x then true else (check_include x b)
+|[]->false;;
+
+let rec get_index x l=
+match l with
+a::b-> if a = x then 1 else (1+(get_index x b))
+|[]->failwith"get_index";;
+
+let debraun_of_lamda lamd=
+let rec sup_f lam lis=
+match lam with
+Var s-> if (check_include s lis) then Index (get_index s lis) else Var_d s
+|App (l1,l2) -> App_d (sup_f l1 lis,sup_f l2 lis)
+|Abs (s,l2) -> Abs_d (sup_f l2 (s::lis)) in
+sup_f lamd [];;
+
+let rec print_lamda lam =
+match lam with
+Var s-> print_string("\""^s^"\"")
+|App (l1,l2) -> print_string"(";print_lamda l1;print_string" ";print_lamda l2;print_string")"
+|Abs (s,l2)-> print_string("$\""^s^"\".");print_lamda l2;;
+
+let rec print_debraun deb =
+match deb with
+Var_d s-> print_string("\""^s^"\"")
+|Index i->print_int i
+|App_d (l1,l2) -> print_string"(";print_debraun l1;print_string" ";print_debraun l2;print_string")"
+|Abs_d l2-> print_string"$.";print_debraun l2;;
+ 
+         (*
+print_debraun (debraun_of_lamda (Abs ("x",(App (Var "x",Var"y")))));;
+           *)
+let find_new l=
+let rec sup_f i lis=
+if (check_include ("x#"^(string_of_int i)) lis) then (sup_f (i+1) lis) else (string_of_int i) in
+"x#"^(sup_f 1 l);;
+
+let rec list_of_names_debraun deb=
+match deb with
+Var_d s->[s]
+|App_d (l1,l2) -> ((list_of_names_debraun l1)@(list_of_names_debraun l2))
+|Abs_d l2 ->(list_of_names_debraun l2)
+|_-> [];;
+
+ 
+let rec give_elem i l=
+match l with
+a::b-> if i = 1 then a else (give_elem  (i - 1) b)
+|[]-> failwith"give_elem";;
+
+
+let lamda_of_debraun lamd=
+let rec sup_f lam lis_var lis_name=
+(match lam with
+Var_d s->(lis_name,Var s)
+|Index i->(lis_name,Var (give_elem i lis_var))
+|Abs_d l2->let n_var = (find_new lis_name) in 
+           let (n_lis_name,n_l) = (sup_f l2 (n_var::lis_var) (n_var::lis_name)) in 
+                          (n_lis_name,Abs (n_var,n_l))
+|App_d (l1,l2)->let (n_lis_name,n_l1) = (sup_f l1 lis_var lis_name) in
+                let (nn_lis_name,n_l2) = (sup_f l2 lis_var (*n_lis_name*)lis_name) in
+                  (nn_lis_name,App (n_l1,n_l2)) )in
+(fun (x,y) -> y) (sup_f lamd [] (list_of_names_debraun lamd));;
+
+let rec check_bette_red deb =
+match deb with
+App_d (l1,l2) -> (match l1 with Abs_d _->true|_->((check_bette_red l1)||(check_bette_red l2)))
+|Abs_d l2 -> check_bette_red l2
+|_->false;;
+
+let level_up deb=
+let rec sup_f de n=
+match de with
+Var_d s->Var_d s
+|Index i -> if i >= n then Index (i+1) else de
+|App_d (l1,l2) -> App_d (sup_f l1 n,sup_f l2 n)
+|Abs_d l2->Abs_d (sup_f l2 (n+1)) in
+sup_f deb 1;;       
+
+let rec replace deb n deb2=
+match deb with
+Index i-> if i = n then deb2 else (if i > n then Index (i-1) else Index i)
+|Var_d s->Var_d s
+|App_d (l1,l2) ->App_d ((replace l1 n deb2),(replace l2 n deb2))
+|Abs_d l2->Abs_d (replace l2 (n+1) (level_up deb2));;
+
+
+let rec betta_reduction deb=
+match deb with
+Index i-> Index i
+|Var_d s-> Var_d s
+|App_d (l1,l2) -> (match l1 with
+                   Abs_d l3 -> (replace l3 1 l2)
+                  |_-> let n_l1 = betta_reduction l1 in if n_l1 = l1 then (App_d (l1,(betta_reduction l2))) else (App_d (n_l1,l2))) 
+|Abs_d l2-> Abs_d (betta_reduction l2);;
+
+
+let rec betta_reduct lam=
+print_lamda lam;
+print_string"\n";
+let deb = (debraun_of_lamda lam) in
+(*print_debraun deb;
+print_string"\n";*)
+let n_deb = betta_reduction deb in
+(*print_debraun n_deb;*)
+if n_deb = deb then lam else (betta_reduct (lamda_of_debraun n_deb));;
+
+(*\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*)
+
+(*let rec read_l s i=
+if s.[i] = '(' then (let (i2,l2)= read_l s (i+1) in 
+                                        let (i3,l3)= read_l s (i2+1) in (i3+1,App (l2,l3)))
+               else if s.[i] = '$' then (let (i2,s2)= read_s s (i+1) in
+                                        let (i3,l3)= read_l s (i2+1) in (i3,Abs (s2,l3)))
+                                   else let (i2,s2) = read_s s i in
+                                                   (i2,Var s2)
+
+and read_s s i=
+if i = String.length s then (i,"")
+                       else if (s.[i] = '.')||(s.[i] = ' ')||(s.[i] = ')') then (i,"")
+                                                                         else let (i2,s2) = (read_s s (i+1)) in
+                                                                                  (i2,((String.make 1 (s.[i]))^s2));;
+*)
+
+let rec read_l s i=
+if s.[i] = '$' then (let (i2,s2)= read_s s (i+1) in
+                                        let (i3,l3)= read_l s (i2+1) in (i3,Abs (s2,l3)))
+               else if s.[i] = '(' then (let (i2,l2) = read_l s (i+1) in if s.[i2] = ')' then (i2 + 1, l2) 
+                                                                                         else (if s.[i2] = ' ' then (read_abb s (i2+1) l2) 
+                                                                                                               else (read_abb s i2 l2)))
+                                   else (let (i1,s1) = (read_s s i) in (i1, Var s1))
+
+and read_abb s i l= 
+let (i1,l1) = (read_l s i) in (if s.[i1] = ')' then (i1 + 1,App (l,l1)) else (if s.[i1] = ' ' then (read_abb s (i1+1) (App (l,l1))) else (read_abb s i1 (App (l,l1)))))
+
+and read_s s i=
+if i = String.length s then (i,"")
+                       else if (s.[i] = '.')||(s.[i] = ' ')||(s.[i] = ')') then (i,"")
+                                                                         else let (i2,s2) = (read_s s (i+1)) in
+                                                                                  (i2,((String.make 1 (s.[i]))^s2));;
+
+
+(*\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*)
+let seporate_line lin=
+let rec name_of_func i s=
+if lin.[i] = ' ' then let (_,lambd1) = (read_l lin (i+3)) in (s,lambd1)
+                 else (name_of_func (i+1) (s^(String.make 1 (lin.[i])))) in
+name_of_func 0 "";;
+
+
+let read_instrations s=
+let rec sup_f f l=
+try
+    let lin = input_line f in sup_f f (l @ [seporate_line lin])
+with
+    _->l in
+let t = open_in s in
+let l = sup_f t [] in
+close_in t; l;;
+
+let rec find_func name lib=
+let rec s_f i= if i = 0 then (Var "x") else (App (Var "f",(s_f (i-1)))) in
+try (let n = (int_of_string name) in (Abs ("f",(Abs("x",(s_f n))))))
+with 
+     _->(let rec sup_f x l = match l with (a,b)::c-> if a = x then b else (sup_f x c)| []-> Var x in (sup_f name lib))
+
+let rec open_pre_lambd pre_lam lam_lib =
+match pre_lam with
+Var s -> (find_func s lam_lib)
+|App (l1,l2) ->(App ((open_pre_lambd l1 lam_lib),(open_pre_lambd l2 lam_lib)))
+|Abs (s1,l1) -> (Abs (s1,(open_pre_lambd l1 lam_lib)))
+
+let rec lib_to_lam_lim l1 l2= 
+match l1 with
+(x,y)::b-> lib_to_lam_lim b ((x,open_pre_lambd y l2)::l2)
+|[]-> l2;;
+(*\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\*)
+                                                        
+
+let lib = read_instrations "library3.txt";;
+
+let (_,a) = seporate_line "1 = (Div 5 2)";;
+                                                                          
+let library = lib_to_lam_lim lib [];; 
+
+betta_reduct (open_pre_lambd a library);; 
+   
+    
+                                                                                                      
+    
